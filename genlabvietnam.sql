@@ -1,0 +1,289 @@
+-- TẠO DATABASE
+CREATE DATABASE genlabvietnam;
+DROP DATABASE genlabvietnam;
+USE genlabvietnam;
+
+-- ACCOUNT
+CREATE TABLE ACCOUNT (
+    AccountID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    UserName VARCHAR(100) NOT NULL,
+    Password VARCHAR(100) NOT NULL,
+    Email VARCHAR(100) NOT NULL,
+    Role VARCHAR(50) NOT NULL,
+    Status ENUM('on', 'off') DEFAULT 'on'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- INFORMATION
+CREATE TABLE INFORMATION (
+    InformationID BIGINT PRIMARY KEY,
+    Name_Information VARCHAR(100) NOT NULL,
+    Gender VARCHAR(10) NOT NULL,
+    Date_Of_Birth DATE NOT NULL,
+    Address VARCHAR(255) NOT NULL,
+    Phone VARCHAR(20) NOT NULL,
+    CCCD VARCHAR(20),
+    AccountID BIGINT NOT NULL,
+    FOREIGN KEY (AccountID) REFERENCES ACCOUNT(AccountID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- SERVICE
+CREATE TABLE SERVICE (
+    Service_ID INT PRIMARY KEY,
+    Service_Name VARCHAR(100) NOT NULL,
+    Description VARCHAR(255),
+    Sample_Method VARCHAR(100) NOT NULL,
+    Estimated_Time VARCHAR(50) NOT NULL,
+    Price DECIMAL(18,2) NOT NULL,
+    Status ENUM('on', 'off') DEFAULT 'on'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+-- PAYMENT
+CREATE TABLE PAYMENT (
+    PM_ID BIGINT PRIMARY KEY,
+    Amount DECIMAL(18,2) NOT NULL,
+    Type VARCHAR(50) NOT NULL,
+    Payment_Date DATE NOT NULL,
+    Status ENUM('Chờ xác nhận', 'Đã thanh toán', 'Thất bại') DEFAULT 'Chờ xác nhận'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- BOOKING
+CREATE TABLE BOOKING (
+    Booking_ID BIGINT PRIMARY KEY AUTO_INCREMENT,
+    BookingDate DATE NOT NULL,
+    Status VARCHAR(50) NOT NULL,
+    Category VARCHAR(50),
+    Money DECIMAL(18,2) NOT NULL,
+    Phone VARCHAR(20),                
+    Address VARCHAR(255),
+    AppointmentTime TIME,
+    AppointmentDate DATE,
+    AccountID BIGINT NOT NULL,
+    Service_ID INT NOT NULL,
+    PM_ID BIGINT NULL,
+    Kitdelivery_ID BIGINT NULL,
+    Feedback_ID BIGINT NULL,
+    
+    FOREIGN KEY (AccountID) REFERENCES ACCOUNT(AccountID),
+    FOREIGN KEY (Service_ID) REFERENCES SERVICE(Service_ID),
+    FOREIGN KEY (PM_ID) REFERENCES PAYMENT(PM_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- KIT DELIVERY
+CREATE TABLE KIT_DELIVERY (
+    Kitdelivery_ID BIGINT AUTO_INCREMENT PRIMARY KEY,
+    Send_Date DATE NOT NULL,
+    Receive_Date DATE,
+    Status VARCHAR(50) NOT NULL,
+    Booking_ID BIGINT,
+    FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- FEEDBACK
+CREATE TABLE FEEDBACK_AND_RATING (
+    Feedback_ID BIGINT PRIMARY KEY,
+    Comment VARCHAR(255),
+    Date DATE,
+    Booking_ID BIGINT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- RATING
+CREATE TABLE RATING (
+    Rate_ID BIGINT PRIMARY KEY,
+    Number INT NOT NULL,
+    Feedback_ID BIGINT UNIQUE,
+    FOREIGN KEY (Feedback_ID) REFERENCES FEEDBACK_AND_RATING(Feedback_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- TABLE SAMPLE
+CREATE TABLE SAMPLE (
+    Sample_ID BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    Sample_Name VARCHAR(100) NULL,
+    Received_At_Lab_Date DATE NULL,
+    Collection_Date DATE NULL,
+    Booking_ID BIGINT NOT NULL,
+    Kitdelivery_ID BIGINT NULL,
+    AccountID BIGINT NOT NULL,
+    FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID),
+    FOREIGN KEY (Kitdelivery_ID) REFERENCES KIT_DELIVERY(Kitdelivery_ID),
+    FOREIGN KEY (AccountID) REFERENCES ACCOUNT(AccountID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- BOOKING CANCEL (đã đổi tên BK_ID -> Cancel_ID, bỏ Refund_Date)
+CREATE TABLE BOOKING_CANCEL (
+    Cancel_ID BIGINT PRIMARY KEY,
+    Note VARCHAR(255),
+    Total_Refund DECIMAL(18,2),
+    InformationID BIGINT NOT NULL,
+    Booking_ID BIGINT NOT NULL UNIQUE,
+    FOREIGN KEY (InformationID) REFERENCES INFORMATION(InformationID),
+    FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- REFUND (thêm Refund_Date)
+CREATE TABLE REFUND (
+    Cancel_ID BIGINT PRIMARY KEY,
+    InformationID BIGINT NOT NULL,
+    Booking_ID BIGINT NOT NULL,
+    Refund_Date DATE NOT NULL,
+    FOREIGN KEY (Cancel_ID) REFERENCES BOOKING_CANCEL(Cancel_ID),
+    FOREIGN KEY (InformationID) REFERENCES INFORMATION(InformationID),
+    FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- REASON
+CREATE TABLE REASON (
+    RS_ID BIGINT PRIMARY KEY,
+    Content VARCHAR(255) NOT NULL,
+    Cancel_ID BIGINT,
+    FOREIGN KEY (Cancel_ID) REFERENCES BOOKING_CANCEL(Cancel_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- TEST RESULT
+CREATE TABLE TEST_RESULT (
+    Test_ID BIGINT PRIMARY KEY,
+    Test_Date DATE NOT NULL,
+    Result VARCHAR(255) NOT NULL,
+    Sample_ID BIGINT NOT NULL,
+    Booking_ID BIGINT NOT NULL,
+    FOREIGN KEY (Sample_ID) REFERENCES SAMPLE(Sample_ID),
+    FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- APPOINTMENT (KHÔNG CÒN RÀNG BUỘC VỚI BOOKING)
+CREATE TABLE APPOINTMENT (
+    Appointment_ID BIGINT PRIMARY KEY,
+    Booking_ID BIGINT,
+    Location VARCHAR(255) NOT NULL,
+    ScheduledDate DATETIME NOT NULL,
+    Staff_ID BIGINT NOT NULL,
+    FOREIGN KEY (Staff_ID) REFERENCES ACCOUNT(AccountID)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- FOREIGN KEY VÒNG
+ALTER TABLE BOOKING
+    ADD CONSTRAINT FK_Booking_Kit FOREIGN KEY (Kitdelivery_ID) REFERENCES KIT_DELIVERY(Kitdelivery_ID),
+    ADD CONSTRAINT FK_Booking_Feedback FOREIGN KEY (Feedback_ID) REFERENCES FEEDBACK_AND_RATING(Feedback_ID);
+
+ALTER TABLE KIT_DELIVERY
+    ADD CONSTRAINT FK_Kit_Booking FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID);
+
+ALTER TABLE FEEDBACK_AND_RATING
+    ADD CONSTRAINT FK_Feedback_Booking FOREIGN KEY (Booking_ID) REFERENCES BOOKING(Booking_ID);
+
+-- DỮ LIỆU MẪU
+
+-- ACCOUNT
+INSERT INTO ACCOUNT (AccountID, UserName, Password, Email, Role, Status) VALUES
+(20250626140100001, 'nguyenphuchau', 'hau', 'haunpse183421@fpt.edu.vn', 'Customer', 'on'),
+(20250626140100002, 'nguyenxuantruong', 'truong', 'truongnxSE184799@fpt.edu.vn', 'Manager', 'on'),
+(20250626140100003, 'dothithuhien', 'hien', 'hiendttSE184573@fpt.edu.vn', 'Staff', 'on'),
+(20250626140100004, 'caothienphuc', 'phuc', 'phucctse183883@fpt.edu.vn', 'Admin', 'on'),
+(20250626140100005, 'tranhuynhminhtan', 'tan', 'tanthmse184812@fpt.edu.vn', 'Staff', 'on'),
+(20250626140100006, 'nguyenthitamnhu', 'nhu', 'nhunttse@fpt.edu.vn', 'Customer', 'on'),
+(20250626140100007, 'huynhthimyquyen', 'quyen', 'quyenhtm@gmail.com', 'Customer', 'off');
+
+
+-- INFORMATION
+INSERT INTO INFORMATION (InformationID, Name_Information, Gender, Date_Of_Birth, Address, Phone, CCCD, AccountID) VALUES
+(20250626140200001, 'Nguyễn Phúc Hậu', 'Nam', '1994-05-20', 'Tiền Giang', '0901010101', '009401010101', 20250626140100001),
+(20250626140200002, 'Nguyễn Xuân Trường', 'Nam', '1995-07-18', 'Huế', '0902020202', '009502020202', 20250626140100002),
+(20250626140200003, 'Đỗ Thị Thu Hiền', 'Nữ', '1996-03-22', 'Nam Định', '0903030303', '009603030303', 20250626140100003),
+(20250626140200004, 'Cao Thiên Phúc', 'Nam', '1997-09-05', 'Đắk Lắk', '0904040404', '009704040404', 20250626140100004),
+(20250626140200005, 'Trần Huỳnh Minh Tân', 'Nam', '1998-11-30', 'Bình Dương', '0905050505', '009805050505', 20250626140100005),
+(20250626140200006, 'Lê Quang Thắng', 'Nam', '1993-02-14', 'Hải Dương', '0906060606', '009306060606', 20250626140100006),
+(20250626140200007, 'Nguyễn Khánh Trình', 'Nam', '1992-06-09', 'Nghệ An', '0907070707', '009207070707', 20250626140100007);
+
+-- SERVICE
+INSERT INTO SERVICE (Service_ID, Service_Name, Description, Sample_Method, Estimated_Time, Price, Status) VALUES
+(1, 'Xét nghiệm ADN tại cơ sở y tế', 'Khách hàng đến cơ sở', 'Lấy mẫu tại cơ sở', '3 ngày', 1500000, 'on'),
+(2, 'Khách hàng tự thu mẫu tại nhà', 'Gửi bộ kit', 'Tự thu mẫu', '5 ngày', 1700000, 'on'),
+(3, 'Nhân viên y tế đến nhà lấy mẫu', 'Nhân viên đến tận nơi', 'Nhân viên đến nhà', '4 ngày', 2000000, 'on'),
+(4, 'Hành chính (tại CSYT)', 'Dịch vụ hành chính và giấy tờ', 'Tại cơ sở y tế', '1 ngày', 500000, 'on');
+
+
+-- PAYMENT
+INSERT INTO PAYMENT (PM_ID, Amount, Type, Payment_Date, Status) VALUES
+(20250607120000001, 1700000, 'Chuyển khoản', '2025-06-06', 'Đã thanh toán');
+
+-- BOOKING
+INSERT INTO BOOKING (Booking_ID, BookingDate, Status, Category, Money, AccountID, Service_ID, PM_ID)
+VALUES 
+(20250607120000002, '2025-06-06', 'Đã hoàn thành', 'Tự thu mẫu', 1700000, 20250626140100001, 2, 20250607120000001);
+
+-- KIT_DELIVERY
+INSERT INTO KIT_DELIVERY (Kitdelivery_ID, Send_Date, Receive_Date, Status, Booking_ID) VALUES
+(20250607120000003, '2025-06-06', '2025-06-07', 'Đã nhận', 20250607120000002);
+
+-- Update Booking
+UPDATE BOOKING SET Kitdelivery_ID = 20250607120000003 WHERE Booking_ID = 20250607120000002;
+
+-- FEEDBACK_AND_RATING
+INSERT INTO FEEDBACK_AND_RATING (Feedback_ID, Comment, Date, Booking_ID) VALUES
+(20250607120000004, 'Dịch vụ nhanh chóng và chuyên nghiệp.', '2025-06-08', 20250607120000002);
+
+-- RATING
+INSERT INTO RATING (Rate_ID, Number, Feedback_ID) VALUES
+(20250607120000005, 5, 20250607120000004);
+
+-- Update Booking
+UPDATE BOOKING SET Feedback_ID = 20250607120000004 WHERE Booking_ID = 20250607120000002;
+
+-- SAMPLE
+INSERT INTO SAMPLE (Sample_ID, Sample_Name, Received_At_Lab_Date, Collection_Date, Booking_ID, Kitdelivery_ID, AccountID) VALUES
+(20250607120000006, 'Máu', '2025-06-09', '2025-06-08', 20250607120000002, 20250607120000003, 20250626140100001);
+
+-- TEST_RESULT
+INSERT INTO TEST_RESULT (Test_ID, Test_Date, Result, Sample_ID, Booking_ID) VALUES
+(20250607120000007, '2025-06-10', 'Không phải cha con', 20250607120000006, 20250607120000002);
+
+-- APPOINTMENT
+INSERT INTO APPOINTMENT (Appointment_ID, Booking_ID, Location, ScheduledDate, Staff_ID) VALUES
+(20250627100000001, 20250607120000002, 'Cơ sở Hà Nội', '2025-06-09 09:00:00', 20250626140100003);
+
+-- BOOKING_CANCEL
+INSERT INTO BOOKING_CANCEL (Cancel_ID, Note, Total_Refund, InformationID, Booking_ID) VALUES
+(20250627100000008, 'Khách yêu cầu hủy vì lý do cá nhân', 1700000, 20250626140200001, 20250607120000002);
+
+-- REFUND
+INSERT INTO REFUND (Cancel_ID, InformationID, Booking_ID, Refund_Date) VALUES
+(20250627100000008, 20250626140200001, 20250607120000002, '2025-06-11');
+
+-- REASON
+INSERT INTO REASON (RS_ID, Content, Cancel_ID) VALUES
+(20250627100000009, 'Không còn nhu cầu sử dụng dịch vụ', 20250627100000008);
+
+
+SELECT * FROM ACCOUNT;
+SELECT * FROM INFORMATION;
+SELECT * FROM SERVICE;
+SELECT * FROM PAYMENT;
+SELECT * FROM BOOKING;
+SELECT * FROM KIT_DELIVERY;
+SELECT * FROM SAMPLE;
+SELECT * FROM FEEDBACK_AND_RATING;
+SELECT * FROM RATING;
+SELECT * FROM REFUND;
+
+SELECT * FROM SAMPLE WHERE Sample_ID = 20250607120000010;
+
+-- Test 
+INSERT INTO BOOKING (Booking_ID, BookingDate, Status, Category, Money, AccountID, Service_ID, PM_ID)
+VALUES (20250607120000100, '2025-06-27', 'Đang xử lý', 'Tự thu mẫu', 1500000, 20250626140100001, 2, 20250607120000001);
+
+-- Kiểm tra booking
+SELECT * FROM booking WHERE Booking_ID = 20250607120000100;
+
+-- Kiểm tra kit
+SELECT * FROM kit_delivery WHERE Kitdelivery_ID = 20250607120000004;
+
+-- Check mối liên kết
+SELECT * FROM kit_delivery WHERE Booking_ID = 20250607120000100;
+
+SELECT * FROM SAMPLE WHERE Sample_ID = 20250607120000010;
+
+DELETE FROM BOOKING
+WHERE Booking_ID = 20250607120000008;
+
+SELECT * FROM ACCOUNT WHERE Email = 'nhunttse@fpt.edu.vn';

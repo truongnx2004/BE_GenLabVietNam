@@ -1,0 +1,16 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\BE",
+    "\\BE\\src",
+    "\\BE\\src\\controllers",
+    "\\BE\\src\\routes",
+    "\\FE",
+    "\\FE\\src",
+    "\\FE\\src\\pages",
+    "\\FE\\src\\pages\\manager",
+    "\\FE\\src\\pages\\staff"
+  ],
+  "SelectedNode": "\\FE\\src\\pages\\staff\\ManagerSamplePage.jsx",
+  "PreviewInSolutionExplorer": false
+}
