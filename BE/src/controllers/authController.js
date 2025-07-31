@@ -80,6 +80,10 @@ const login = async (req, res) => {
         username: user.UserName,
         email: user.Email,
         role: user.Role,
+<<<<<<< HEAD
+=======
+        status: user.Status,
+>>>>>>> d06bfb0a (cập nhật các function CRUD của manager và admin, xem profile và chức năng login)
       },
       token
     });
