@@ -1,19 +1,14 @@
 const { DataTypes } = require("sequelize");
-const sequelize = require("./index");
+const sequelize = require("../config/database");
 
-const TestResult = sequelize.define(
-  "TestResult",
-  {
-    Test_ID: { type: DataTypes.BIGINT, primaryKey: true },
-    Test_Date: DataTypes.DATE,
-    Result: DataTypes.STRING,
-    Sample_ID: DataTypes.BIGINT,
-    Booking_ID: DataTypes.BIGINT,
-  },
-  {
-    tableName: "TEST_RESULT",
-    timestamps: false,
-  }
-);
+const Test_Result = sequelize.define("Test_Result", {
+  Test_ID: { type: DataTypes.BIGINT, primaryKey: true },
+  Test_Date: DataTypes.DATEONLY,
+  Result: DataTypes.STRING(255),
+  Booking_ID: DataTypes.BIGINT
+}, {
+  tableName: "Test_Result",
+  timestamps: false
+});
 
-module.exports = TestResult;
+module.exports = Test_Result;

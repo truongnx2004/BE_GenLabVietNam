@@ -1,52 +1,14 @@
-// const Account = require("../models/Account");
-
-// exports.login = async (req, res) => {
-//   const { username, password } = req.body;
-
-//   try {
-//     const user = await Account.findOne({
-//       where: {
-//         UserName: username,
-//         Password: password, // ⚠️ phải đúng cả hai
-//       },
-//     });
-
-//     if (!user) {
-//       return res.status(401).json({ message: "Sai tài khoản hoặc mật khẩu" });
-//     }
-
-//     return res.status(200).json({
-//       message: "Đăng nhập thành công",
-//       data: {
-//         id: user.AccountID,
-//         username: user.UserName,
-//         role: user.Role,
-//       },
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Lỗi đăng nhập" });
-//   }
-// };
 const bcrypt = require("bcrypt");
-const jwt = require('jsonwebtoken');
-
-
-const { OAuth2Client } = require("google-auth-library"); // ✅ Dòng này bắt buộc
-
+const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 const { Op } = require("sequelize");
 const Account = require("../models/Account");
 const Information = require("../models/Information");
 const transporter = require("../utils/mailer");
 
 const login = async (req, res) => {
-  const { username, password } = req.body; 
-
-  // 🟢 SỐ (1): In giá trị người dùng nhập
-  console.log("👉 Đang kiểm tra tài khoản:", username, password);
-
+  const { username, password } = req.body;
   try {
-    // 🟢 SỐ (2): Truy vấn tài khoản từ database
     const user = await Account.findOne({
       where: {
         [Op.or]: [{ UserName: username }, { Email: username }],
@@ -54,20 +16,16 @@ const login = async (req, res) => {
       },
     });
 
-    // 🟢 SỐ (3): In kết quả tìm được
-    console.log("🔍 Kết quả tìm user:", user);
-
     if (!user) {
       return res.status(401).json({ message: "Sai tài khoản hoặc mật khẩu" });
     }
 
-    // Tạo JWT chứa role
     const token = jwt.sign(
       {
-        id: user.AccountID,
-            username: user.UserName,
-            email: user.Email,
-            role: user.Role
+        id: user.Account_ID, // Đúng tên trường
+        username: user.UserName,
+        email: user.Email,
+        role: user.Role,
       },
       process.env.JWT_SECRET || "your-secret",
       { expiresIn: "1d" }
@@ -76,16 +34,13 @@ const login = async (req, res) => {
     return res.status(200).json({
       message: "Đăng nhập thành công",
       user: {
-        id: user.AccountID,
+        id: user.Account_ID,
         username: user.UserName,
         email: user.Email,
         role: user.Role,
-<<<<<<< HEAD
-=======
         status: user.Status,
->>>>>>> d06bfb0a (cập nhật các function CRUD của manager và admin, xem profile và chức năng login)
       },
-      token
+      token,
     });
   } catch (err) {
     console.error("❌ Lỗi đăng nhập:", err);
@@ -101,7 +56,6 @@ const googleLogin = async (req, res) => {
   const { credential } = req.body;
 
   try {
-    // 1. Xác thực credential
     const ticket = await client.verifyIdToken({
       idToken: credential,
       audience:
@@ -112,24 +66,24 @@ const googleLogin = async (req, res) => {
     const email = payload.email;
     const name = payload.name;
 
-    // 2. Tìm hoặc tạo tài khoản trong DB
     let user = await Account.findOne({ where: { Email: email } });
 
     if (!user) {
       user = await Account.create({
+        Account_ID: Date.now(),
         UserName: email.split("@")[0],
         Email: email,
-        Password: "", // để trống vì dùng Google
+        Password: "",
         Role: "Customer",
+        Status: "ON",
       });
     }
 
-    // 3. Tạo JWT chứa role
     const token = jwt.sign(
       {
-        id: user.AccountID,
+        id: user.Account_ID,
         username: user.UserName,
-        role: user.Role
+        role: user.Role,
       },
       process.env.JWT_SECRET || "your-secret",
       { expiresIn: "1d" }
@@ -139,7 +93,7 @@ const googleLogin = async (req, res) => {
       message: "Đăng nhập Google thành công",
       token,
       user: {
-        id: user.AccountID,
+        id: user.Account_ID,
         username: user.UserName,
         email: user.Email,
         role: user.Role,
@@ -151,14 +105,15 @@ const googleLogin = async (req, res) => {
   }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-
-const otpStore = new Map(); // lưu OTP tạm thời
+// Lưu OTP và thông tin đăng ký tạm thời
+const otpStore = new Map(); // email => otp
+const pendingRegisterStore = new Map(); // email => userData
 
 const generateId = () => {
-  return Date.now(); // hoặc dùng logic tạo ID theo chuẩn của bạn
+  return Date.now();
 };
 
+// Bước 1: Nhận thông tin đăng ký, gửi OTP về email, lưu tạm thông tin
 const register = async (req, res) => {
   const {
     username,
@@ -170,56 +125,93 @@ const register = async (req, res) => {
     dob,
     address,
     phone,
-    cccd
+    cccd,
   } = req.body;
 
   try {
-    // Kiểm tra email đã tồn tại
     const existing = await Account.findOne({ where: { Email: email } });
     if (existing) return res.status(400).json({ message: "Email đã tồn tại!" });
 
-    // Tạo ID và mã hóa mật khẩu
+    // Sinh OTP và lưu tạm thông tin đăng ký
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(email, otp);
+    pendingRegisterStore.set(email, {
+      username,
+      password,
+      email,
+      role,
+      name,
+      gender,
+      dob,
+      address,
+      phone,
+      cccd,
+    });
+
+    await transporter.sendMail({
+      from: "GENLAB Vietnam <ngxtruong010204@gmail.com>",
+      to: email,
+      subject: "Mã xác thực đăng ký tài khoản GENLAB",
+      text: `Chào ${name},\n\nMã xác thực đăng ký tài khoản của bạn là: ${otp}\n\nVui lòng nhập mã này để hoàn tất đăng ký.\n\nNếu bạn không thực hiện đăng ký, hãy bỏ qua email này.`,
+    });
+
+    res.json({ message: "Đã gửi mã xác thực OTP về email. Vui lòng kiểm tra hộp thư." });
+  } catch (error) {
+    console.error("Lỗi gửi OTP đăng ký:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi gửi OTP!" });
+  }
+};
+
+// Bước 2: Xác thực OTP, nếu đúng thì tạo tài khoản
+const verifyRegisterOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  const validOtp = otpStore.get(email);
+  const userData = pendingRegisterStore.get(email);
+
+  if (!validOtp || otp !== validOtp) {
+    return res.status(400).json({ message: "OTP không hợp lệ hoặc đã hết hạn." });
+  }
+  if (!userData) {
+    return res.status(400).json({ message: "Không tìm thấy thông tin đăng ký tạm thời." });
+  }
+
+  try {
     const accountId = generateId();
-    const plainPassword = password;
-
-
-    // Tạo tài khoản
     await Account.create({
-      AccountID: accountId,
-      UserName: username,
-      Password: plainPassword,
-      Email: email,
-      Role: role,
-      Status: 'on'
+      Account_ID: accountId,
+      UserName: userData.username,
+      Password: userData.password,
+      Email: userData.email,
+      Role: userData.role,
+      Status: "ON",
     });
-
-    // Tạo hồ sơ người dùng
     await Information.create({
-      InformationID: accountId + 1,
-      Name_Information: name,
-      Gender: gender,
-      Date_Of_Birth: dob,
-      Address: address,
-      Phone: phone,
-      CCCD: cccd,
-      AccountID: accountId
+      Information_ID: accountId + 1,
+      Name_Information: userData.name,
+      Gender: userData.gender,
+      Date_Of_Birth: userData.dob,
+      Address: userData.address,
+      Phone: userData.phone,
+      CCCD: userData.cccd,
+      Account_ID: accountId,
     });
 
-    // Gửi email xác nhận
+    otpStore.delete(email);
+    pendingRegisterStore.delete(email);
+
     await transporter.sendMail({
       from: "GENLAB Vietnam <ngxtruong010204@gmail.com>",
       to: email,
       subject: "Đăng ký thành công",
-      text: `Chào ${name},\n\nBạn đã đăng ký tài khoản thành công tại GENLAB.\n\nThông tin tài khoản:\nTên đăng nhập: ${username}\nEmail: ${email}\n\nCảm ơn bạn!`,
+      text: `Chào ${userData.name},\n\nBạn đã đăng ký tài khoản thành công tại GENLAB.\n\nThông tin tài khoản:\nTên đăng nhập: ${userData.username}\nEmail: ${email}\n\nCảm ơn bạn!`,
     });
 
     res.json({ message: "Đăng ký thành công! Vui lòng kiểm tra email." });
   } catch (error) {
-    console.error("Lỗi đăng ký:", error);
-    res.status(500).json({ message: "Lỗi máy chủ!" });
+    console.error("Lỗi xác thực OTP đăng ký:", error);
+    res.status(500).json({ message: "Lỗi máy chủ khi xác thực OTP!" });
   }
 };
-
 
 const resetPassword = async (req, res) => {
   const { email, otp, newPassword } = req.body;
@@ -231,7 +223,6 @@ const resetPassword = async (req, res) => {
       .json({ message: "OTP không hợp lệ hoặc đã hết hạn." });
   }
 
-  // ❌ Không mã hóa mật khẩu (CHỈ dùng cho mục đích học tập/demo)
   await Account.update({ Password: newPassword }, { where: { Email: email } });
 
   otpStore.delete(email);
@@ -249,7 +240,7 @@ const sendResetOtp = async (req, res) => {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(email, otp); // Lưu OTP tạm thời
+    otpStore.set(email, otp);
 
     await transporter.sendMail({
       from: "GENLAB <ngxtruong010204@gmail.com>",
@@ -267,9 +258,9 @@ const sendResetOtp = async (req, res) => {
 
 module.exports = {
   register,
+  verifyRegisterOtp,
   login,
   googleLogin,
   resetPassword,
-  sendResetOtp
+  sendResetOtp,
 };
-

@@ -1,81 +1,75 @@
 const Account = require("../models/Account");
 const Information = require("../models/Information");
-<<<<<<< HEAD
-=======
-const axios = require("axios");
->>>>>>> d06bfb0a (cập nhật các function CRUD của manager và admin, xem profile và chức năng login)
+// axios không còn được sử dụng nên đã được xóa
 
+// Lấy thông tin hồ sơ của một tài khoản
 exports.getProfile = async (req, res) => {
   try {
-    const account = await Account.findByPk(req.params.accountId);
-    if (!account) return res.status(404).json({ message: "Không tìm thấy tài khoản!" });
+    // Lấy Account_ID từ URL, ví dụ: /api/profile/20250626140100001
+    const { Account_ID } = req.params;
 
-    const information = await Information.findOne({ where: { AccountID: account.AccountID } });
+    // 1. Tìm tài khoản trong bảng ACCOUNT bằng khóa chính
+    const account = await Account.findByPk(Account_ID);
+    if (!account) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản!" });
+    }
 
-    res.json({
-      account,
-      information
+    // 2. Tìm thông tin chi tiết trong bảng INFORMATION dựa trên Account_ID
+    const information = await Information.findOne({
+      where: { Account_ID: account.Account_ID }, // Sử dụng khóa ngoại Account_ID
     });
+    if (!information) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy thông tin hồ sơ!" });
+    }
+
+    // 3. Trả về cả thông tin tài khoản và thông tin chi tiết
+    res.json({ account, information });
   } catch (error) {
+    console.error("❌ Lỗi khi lấy thông tin profile:", error);
     res.status(500).json({ message: "Lỗi server!", error: error.message });
   }
 };
 
+// Cập nhật thông tin hồ sơ
 exports.updateProfile = async (req, res) => {
   try {
-    // Lấy đúng tên trường FE gửi lên
-    const { Name_Information, Gender, Date_Of_Birth, Address, Phone, CCCD } = req.body;
-    const info = await Information.findOne({ where: { AccountID: req.params.accountId } });
-    if (!info) return res.status(404).json({ message: "Không tìm thấy hồ sơ!" });
+    // Lấy Account_ID từ URL
+    const { Account_ID } = req.params;
 
-    await info.update({
+    // Lấy các trường thông tin từ body của request
+    // Các tên trường này phải khớp với tên cột trong bảng INFORMATION
+    const { Name_Information, Gender, Date_Of_Birth, Address, Phone, CCCD } =
+      req.body;
+
+    // 1. Tìm bản ghi Information cần cập nhật
+    const info = await Information.findOne({
+      where: { Account_ID: Account_ID },
+    });
+
+    if (!info) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy hồ sơ để cập nhật!" });
+    }
+
+    // 2. Tạo đối tượng chứa dữ liệu cần cập nhật
+    const updateData = {
       Name_Information,
       Gender,
       Date_Of_Birth,
       Address,
       Phone,
-      CCCD
-    });
+      CCCD,
+    };
 
-<<<<<<< HEAD
-=======
-    // Nếu người dùng có cập nhật địa chỉ → geocode tọa độ
-      if (Address) {
-          const coords = await geocodeAddress(Address);
-          if (coords) {
-              updateData.Latitude = coords.latitude;
-              updateData.Longitude = coords.longitude;
-          }
-      }
+    // 3. Thực hiện cập nhật
+    await info.update(updateData);
 
->>>>>>> d06bfb0a (cập nhật các function CRUD của manager và admin, xem profile và chức năng login)
     res.json({ message: "Cập nhật thông tin thành công!" });
   } catch (error) {
+    console.error("❌ Lỗi khi cập nhật profile:", error);
     res.status(500).json({ message: "Lỗi cập nhật!", error: error.message });
   }
-<<<<<<< HEAD
 };
-=======
-};
-
-async function geocodeAddress(address) {
-    try {
-        const response = await axios.get(
-            "https://api.openrouteservice.org/geocode/search",
-            {
-                params: {
-                    api_key: process.env.ORS_API_KEY, // lấy từ .env
-                    text: address,
-                    boundary_country: "VN"
-                }
-            }
-        );
-
-        const coords = response.data.features[0]?.geometry?.coordinates;
-        return coords ? { longitude: coords[0], latitude: coords[1] } : null;
-    } catch (err) {
-        console.error("❌ Lỗi khi geocode địa chỉ:", err.message);
-        return null;
-    }
-}
->>>>>>> d06bfb0a (cập nhật các function CRUD của manager và admin, xem profile và chức năng login)
